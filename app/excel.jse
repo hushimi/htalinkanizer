@@ -1,0 +1,71 @@
+/**
+ * ----------------------------------------------------
+ * Manipulate Excel.
+ * @param {string} bookPath Path for excel DB
+ * @param {array.<string>} sheets Sheet name that you want to control
+ * ----------------------------------------------------
+ */
+function Excel(bookPath, sheets) {
+    this.bookPath = bookPath;
+    this.sheets = sheets;
+
+    this.ExcelApp = null;
+    this.wb = null;
+}
+
+/**
+ * ----------------------------------------------------
+ * open Excel
+ * ----------------------------------------------------
+ */
+Excel.prototype.openExcel = function(){
+    // Open excel and configure setting
+    this.ExcelApp = new ActiveXObject("Excel.Application");
+    this.ExcelApp.Visible = false;
+    this.ExcelApp.DisplayAlerts = false;
+    this.wb = this.ExcelApp.Workbooks.Open(this.bookPath);
+}
+
+/**
+ * ----------------------------------------------------
+ * delete rows that has delete_flg = true from worksheets
+ * ----------------------------------------------------
+ */
+Excel.prototype.declutterRow = function() {
+    for (let index = 0; index < this.sheets.length; index++) {
+        // Get lastRow of worksheet
+        let ws = this.wb.Worksheets(this.sheets[index]);
+        let lastRow = ws.Cells(ws.Rows.Count, 1).End(-4162).Row;
+
+        // Find delete_flg column number
+        let cell = ws.Cells.find("delete_flg");
+        let tgtCol = cell.column;
+        let isDelete = false;
+
+        // Delete rows if delete_flg = true
+        for (let row = 2; row <= lastRow; row++) {
+            if (isDelete) {
+                row -= 1;
+                isDelete = false;
+            }
+
+            if (ws.Cells(row, tgtCol).value == "true") {
+                ws.Rows(row).Delete();
+                isDelete = true;
+            }
+        }
+        cell = null;
+        ws = null;
+    }
+}
+
+/**
+ * ----------------------------------------------------
+ * Close excel
+ * ----------------------------------------------------
+ */
+Excel.prototype.closeExcel = function() {
+    this.wb.close(true);
+    this.ExcelApp.DisplayAlerts = true;
+    this.ExcelApp.Quit();
+}

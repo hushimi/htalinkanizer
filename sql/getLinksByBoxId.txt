@@ -1,0 +1,9 @@
+SELECT
+[links$].id as link_id,
+[links$].box_id,
+[links$].link_name,
+[links$].link
+FROM [links$]
+WHERE [links$].delete_flg='false'
+AND [links$].box_id='{$box_id}'
+ORDER BY [links$].link_name asc

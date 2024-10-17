@@ -1,0 +1,1 @@
+UPDATE [box$] SET box_name='{$box_name}' WHERE id='{$id}'

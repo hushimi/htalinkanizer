@@ -1,0 +1,760 @@
+// ############################################################
+// Global variable
+// ############################################################
+const helper = new Helper();
+const excel = new Excel(
+    helper.fso.GetFolder(".").Path + "\\database.xlsx",
+    ["box","links"]
+);
+const db = new DB();
+const modal = new Modal();
+
+const main_size = {cx:800, cy:900};
+let watchObj = {
+    watch_name: "",
+    watch_path: ""
+}
+// ############################################################
+// window event
+// ############################################################
+window.resizeTo(
+    main_size.cx,
+    main_size.cy + Math.min(
+        600,
+        Math.max(
+            0,
+            document.body.parentNode.scrollHeight - document.body.parentNode.clientHeight
+        )
+    )
+);
+
+window.onload = function(){
+    // Execute search function when hit enter
+    $("s-bar").addEventListener("keypress", function(event) {
+        if (event.key == "Enter") {
+            searchLink();
+        }
+    });
+    // close modal when click outside of modal
+    document.addEventListener('click', function(e) {
+        if (e.target == modal.wrapper) {
+            modalClose();
+        }
+    });
+
+    // Delete unnecessary rows from excel database
+    setTimeout(function(){
+        excel.openExcel();
+        excel.declutterRow();
+        excel.closeExcel();
+        initApp();
+
+        $("loadingIcon").style.display = "none";
+
+        // settings for storage monitoring
+        setWatchInfo();
+        updateFreeSpace();
+    }, 1500);
+
+    // get server free space
+    setInterval(function() {
+        updateFreeSpace();
+    }, 60000)
+
+    // Draw clock
+    setInterval(function() {
+        const timeObj = getDateTimeStr();
+        $(".clock_date").innerText = timeObj.date;
+        $(".clock_time").innerText = timeObj.time;
+    }, 1000);
+}
+
+window.close = function () {
+    closeADO();
+    $("dbStatus").innerText = "DB connection closed...";
+    $("reloadBtn").style.display = 'block';
+}
+
+/**
+ * ----------------------------------------------------
+ * Try ADODB connection
+ * ----------------------------------------------------
+ */
+function initApp() {
+    let isConnected = db.loadDB();
+    const dbStatus = $("dbStatus");
+    const reloadBtn = $("reloadBtn");
+    dbStatus.innerText = '';
+
+    // draw db connection status
+    if (!isConnected) {
+        dbStatus.innerText = "DB connection failed! Push reload button."
+        dbStatus.style.color = "#f781b0"
+        reloadBtn.style.display = "block";
+
+    } else {
+        dbStatus.innerText = "DB connection succeeded!";
+        dbStatus.style.color = "#3bf79c"
+        reloadBtn.style.display = "none";
+    }
+    readBoxList();
+}
+
+// ############################################################
+// monitor storage free space
+// ############################################################
+/**
+ * ----------------------------------------------------
+ * Update watch name and path
+ * ----------------------------------------------------
+ */
+function setWatchInfo() {
+    // update global variable
+    const records = db.getQueryResult("getWatchPath", {});
+    records.forEach(function(record) {
+        watchObj[record["option_name"]] = record["option_value"];
+    })
+
+    // update watch path name
+    $("watchName").innerHTML = watchObj.watch_name;
+}
+
+/**
+ * ----------------------------------------------------
+ * Display target path's free space
+ * ----------------------------------------------------
+ */
+function updateFreeSpace() {
+    const freeSpace = helper.getFreeSpace(watchObj.watch_path);
+
+    if (freeSpace > 30) {
+        $(".server_freeSpace").style.color = "#2bb371";
+    } else {
+        $(".server_freeSpace").style.color = "#f781b0";
+    }
+    $(".server_freeSpace").innerText = freeSpace + " GB";
+}
+
+/**
+ * ----------------------------------------------------
+ * update watch path
+ * ----------------------------------------------------
+ */
+function updateWatchData() {
+    const linkNameInput = $("input[name='linkName']");
+    let linkName = linkNameInput.value;
+
+    const linkInput = $("input[name='url']");
+    let link = linkInput.value;
+
+    // empty check
+    if (!linkName || !link) {
+        alert("Link name and url can not be empty");
+        return;
+    }
+    linkNameInput.value = "";
+    linkInput.value = "";
+
+    let isUpdate = db.execSQL("updateWatchPath", {
+        watchTitle: linkName,
+        watchPath: link
+    });
+
+    // update global variable and server name
+    modalClose();
+    if (isUpdate) {
+        setWatchInfo();
+        $(".server_freeSpace").innerText = "--- GB";
+    }
+}
+
+// ############################################################
+// Link opener
+// ############################################################
+/**
+ * ----------------------------------------------------
+ * Execute sql and draw folder list
+ * @param {MouseEvent} event
+ * @param {string} link
+ * ----------------------------------------------------
+ */
+function openLink(event, link) {
+    // check if target is li or not
+    if (event.target !== event.currentTarget && event.target.tagName !== "SPAN") {
+        return;
+    }
+
+    let execPath = "\"" + link + "\"";
+    try {
+        helper.shell.Run(execPath);
+    } catch (error) {
+        alert(execPath + "\r\n\r\nリンクが存在しないため開けませんでした。");
+    }
+}
+
+/**
+ * ----------------------------------------------------
+ * Open all links within active box
+ * ----------------------------------------------------
+ */
+function openAll() {
+    const boxId = $("l-boxTitle").getAttribute("data-activeBoxId");
+    const records = db.getQueryResult("getLinksByBoxId", {box_id: boxId});
+
+    records.forEach(function(record) {
+        let execPath = "\"" + record["link"] + "\"";
+        try {
+            helper.shell.Run(execPath);
+        } catch (error) {
+            alert(execPath + "\r\nを開けませんでした。");
+        }
+    });
+}
+
+// ############################################################
+// CRUD for box data
+// ############################################################
+/**
+ * ----------------------------------------------------
+ * Create box and link data, and reload box data
+ * ----------------------------------------------------
+ */
+function createBox() {
+    let boxNameInput = $("input[name='boxName']");
+    let boxName = boxNameInput.value;
+    if (!boxName) {
+        alert("Box name can not be empty!!");
+        return;
+    }
+    boxNameInput.value = "";
+
+    // Get max ID of box table
+    let maxId = db.getMaxNum("box", "id");
+    if (maxId == 0) {
+        alert("Can not create box. Please try again later");
+        modalClose();
+        return;
+    }
+
+    // Execute Insert query
+    let order = db.getMaxNum("box", "disp_order");
+    let isRegister = db.execSQL("createBox", {
+        id: String(maxId),
+        box_name: boxName,
+        order: order
+    });
+    modalClose();
+
+    if (isRegister) {
+        // Activate added box
+        readBoxList();
+        $("[data-boxId='" +  maxId + "']").click();
+    }
+}
+
+/**
+ * ----------------------------------------------------
+ * Read box list
+ * ----------------------------------------------------
+ */
+function readBoxList() {
+    // reset box list
+    const boxList = $("boxList");
+    boxList.innerHTML = "";
+
+    const records = db.getQueryResult('getBox', {});
+    records.forEach(function(record) {
+        boxList.innerHTML += helper.getComponent("boxList", record);
+    });
+}
+
+/**
+ * ----------------------------------------------------
+ * update Box name and reload box data
+ * ----------------------------------------------------
+ */
+function updateBox() {
+    let boxNameInput = $("input[name='boxName']");
+    let boxName = boxNameInput.value;
+    if (!boxName) {
+        alert("Box name can not be empty!!");
+        return;
+    }
+    boxNameInput.value = "";
+
+    let boxId = $("l-boxTitle").getAttribute("data-activeBoxId");
+    let isUpdate = db.execSQL("updateBox", {
+        id: boxId,
+        box_name: boxName
+    });
+
+    modalClose();
+    // reload box list and click target list again
+    if (isUpdate) {
+        readBoxList();
+        $("[data-boxId='"+ boxId + "']").click();
+    }
+}
+
+/**
+ * ----------------------------------------------------
+ * update Box name and reload box data
+ * @param {string} boxId
+ * ----------------------------------------------------
+ */
+function deleteBox(boxId) {
+    let isBoxUpdate = db.execSQL("deleteBox", {box_id: boxId});
+    db.execSQL("deleteLinkByBoxId", {box_id: boxId});
+
+    modalClose();
+    if (isBoxUpdate) {
+        readBoxList();
+        $("linkList").innerHTML = "";
+        $("l-boxTitle").innerHTML = "Select box from the box list"
+        changeBtnStatus("disabled");
+    }
+}
+
+// ############################################################
+// CRUD for link data
+// ############################################################
+/**
+ * ----------------------------------------------------
+ * Create link data
+ * ----------------------------------------------------
+ */
+function createLink() {
+    // get link name
+    const linkNameInput = $("input[name='linkName']");
+    let linkName = linkNameInput.value;
+
+    // get link
+    const linkInput = $("input[name='url']");
+    let link = linkInput.value;
+
+    // empty check
+    if (!linkName || !link) {
+        alert("Link name and url can not be empty");
+        return;
+    }
+    linkNameInput.value = "";
+    linkInput.value = "";
+
+    // Get box ID
+    let boxTitle = $("l-boxTitle");
+    let boxId = boxTitle.getAttribute("data-activeBoxId");
+    let boxName = boxTitle.innerText;
+
+    // Get max ID of links table
+    let maxId = db.getMaxNum("links", "id");
+    if (maxId == 0) {
+        alert("Can not create box. Please try again later");
+        modalClose();
+        return;
+    }
+
+    let isRegister = db.execSQL("createLink", {
+        id: String(maxId),
+        box_id: String(boxId),
+        link_name: linkName,
+        link: link,
+        order: "999"
+    });
+
+    modalClose();
+    if (isRegister) {
+        readLinkList(null, boxId, boxName);
+    }
+}
+
+/**
+ * ----------------------------------------------------
+ * Read link list within box
+ * @param {MouseEvent} event
+ * @param {string} boxId
+ * @param {string} boxName
+ * ----------------------------------------------------
+ */
+function readLinkList(event, boxId, boxName) {
+    // check if target is li or not
+    if (event && event.target !== event.currentTarget && event.target.tagName !== "SPAN") {
+        return;
+    }
+
+    // change active item if event is not null
+    if (event) {
+        let activeItem = document.getElementsByClassName("f-box_item_active");
+        if (activeItem) {
+            for (let i = 0; i < activeItem.length; i++) {
+                const el = activeItem[i];
+                el.classList.remove("f-box_item_active");
+            }
+        }
+        event.currentTarget.classList.add("f-box_item_active");
+    }
+
+    // Set box information
+    $("s-bar").value = "";
+    let boxTitle = $("l-boxTitle");
+    boxTitle.setAttribute("data-activeBoxId", boxId);
+    boxTitle.innerText = boxName;
+
+    // Get record and draw link list
+    $("linkList").innerHTML = "";
+    const records = db.getQueryResult("getLinks", {box_id: boxId});
+    records.forEach(function(record) {
+        record["icon"] = helper.getIconType(record["link"]);
+        record["link"] = record["link"].replace(/\\/g, "\\\\");
+        $("linkList").innerHTML += helper.getComponent("linkList", record);
+    });
+
+    changeBtnStatus("enabled");
+}
+
+/**
+ * ----------------------------------------------------
+ * search link name or path from db
+ * ----------------------------------------------------
+ */
+function searchLink() {
+    // remove active attribute from box list
+    const boxes = document.getElementsByClassName("f-box_item");
+    for (let index = 0; index < boxes.length; index++) {
+        boxes[index].classList.remove("f-box_item_active");
+    }
+
+    // set title and reset link list
+    $("l-boxTitle").innerText = "Search Result";
+    const linkList = $("linkList");
+    linkList.innerHTML = "";
+
+    // get search words
+    const searchStr = $("s-bar").value;
+    let words = searchStr.replace(/　/g, " ").split(" ");
+
+    // Get records and draw search result
+    const records = db.getSearchResult(words);
+    if (records.length <= 0) {
+        linkList.innerHTML = '<span class="l-box_noresult">No Result...</span>'
+    }
+    records.forEach(function(record) {
+        record["icon"] = helper.getIconType(record["link"]);
+        record["link_text"] = record["link"];
+        record["link"] = record["link"].replace(/\\/g, "\\\\");
+        linkList.innerHTML += helper.getComponent("searchResult", record);
+    });
+
+    changeBtnStatus("disabled");
+}
+
+/**
+ * ----------------------------------------------------
+ * update Box name and reload box data
+ * @param {string} linkId
+ * ----------------------------------------------------
+ */
+function updateLink(linkId) {
+    let linkNameInput = $("input[name='linkName']");
+    let linkName = linkNameInput.value;
+
+    let linkInput = $("input[name='url']");
+    let link = linkInput.value;
+
+    let boxTitle = $("l-boxTitle");
+    let boxId = boxTitle.getAttribute("data-activeBoxId");
+    let boxName = boxTitle.innerText;
+
+    // empty check
+    if (!linkName || !link) {
+        alert("Link name and url can not be empty");
+        return;
+    }
+    linkNameInput.value = "";
+    linkInput.value = "";
+
+    let isUpdate = db.execSQL("updateLink", {
+        link_id: linkId,
+        link: link,
+        link_name: linkName
+    });
+
+    modalClose();
+    if (isUpdate) {
+        readLinkList(null, boxId, boxName);
+    }
+}
+
+/**
+ * ----------------------------------------------------
+ * update Box name and reload box data
+ * @param {string} linkId
+ * ----------------------------------------------------
+ */
+function deleteLink(linkId) {
+    let isUpdate = db.execSQL("deleteLink", {link_id: linkId});
+    let boxTitle = $("l-boxTitle");
+    let boxId = boxTitle.getAttribute("data-activeBoxId");
+    let boxName = boxTitle.innerText;
+
+    modalClose();
+    if (isUpdate) {
+        readLinkList(null, boxId, boxName);
+    }
+}
+
+// ############################################################
+// View function
+// ############################################################
+/**
+ * ----------------------------------------------------
+ * update order of box or link data
+ * @param {string} mode
+ * ----------------------------------------------------
+ */
+function updateOrder(mode) {
+    let listElem;
+    let table = "";
+    let attrName = "";
+    switch (mode) {
+    case "box":
+        listElem = document.getElementsByClassName("f-box_item");
+        table = "box";
+        attrName = "data-boxId";
+        break;
+    case "link":
+        listElem = document.getElementsByClassName("l-box_item");
+        table = "links";
+        attrName = "data-linkId";
+        break;
+    default:
+        break;
+    }
+
+    for (let index = 0; index < listElem.length; index++) {
+        let tgtId = listElem[index].getAttribute(attrName);
+        db.execSQL("updateOrder", {
+            table: table,
+            order_num: index + 1,
+            id: tgtId
+        });
+    }
+}
+
+/**
+ * ----------------------------------------------------
+ * Change button status
+ * @param {string} status enabled/disabled
+ * ----------------------------------------------------
+ */
+function changeBtnStatus(status) {
+    const btnWrap = $("l-box_toolbar");
+    const btns = btnWrap.getElementsByClassName("img_btn");
+    // change tool button status
+    for (let index = 0; index < btns.length; index++) {
+        if (status == "enabled") {
+            btns[index].removeAttribute("disabled");
+        } else if(status == "disabled") {
+            btns[index].setAttribute("disabled");
+        }
+    }
+
+    // Change linkList drag and drop event
+    const linkList = $("linkList");
+    if (status == "enabled") {
+        linkList.setAttribute("ondragover", "event.preventDefault()");
+    } else if(status == "disabled") {
+        linkList.setAttribute("ondrop", "");
+    }
+}
+
+// ############################################################
+// modal
+// ############################################################
+/**
+ * ----------------------------------------------------
+ * Open Modal. Change button function depending on mode
+ * @param {MouseEvent} event
+ * @param {string} mode boxAdd/boxEdit/linkAdd/linkEdit/watchEdit
+ * ----------------------------------------------------
+ */
+function modalOpen(event, mode) {
+    modal.show();
+    const boxName = $("l-boxTitle").innerText;
+
+    switch (mode) {
+    case "boxAdd":
+        modal.prepareBoxModal("Add Box", mode);
+        break;
+
+    case "boxEdit":
+        modal.prepareBoxModal("Change box name", mode);
+        break;
+
+    case "linkAdd":
+        modal.prepareLinkModal("Add Link to " + boxName, mode);
+        break;
+
+    case "linkEdit":
+        modal.prepareLinkModal("Update link", mode);
+        const link = event.currentTarget.parentNode.parentNode.getAttribute("data-attr-link");
+        const linkName = event.currentTarget.getAttribute("data-linkName");
+        const linkId = event.currentTarget.getAttribute("data-linkId");
+        modal.prepareLinkEdit(link, linkName, linkId);
+        break;
+
+    case "watchEdit":
+        modal.prepareLinkModal("Update watch path", mode);
+        break;
+
+    case "boxDelete":
+        const boxId = event.currentTarget.parentNode.parentNode.getAttribute("data-boxId");
+        modal.prepareDeleteBoxModal(boxId);
+        break;
+
+    default:
+        break;
+    }
+}
+
+/**
+ * ----------------------------------------------------
+ * Hide modal component
+ * ----------------------------------------------------
+ */
+function modalClose() {
+    modal.hide();
+}
+
+// ############################################################
+// handle drag and drop
+// ############################################################
+/**
+ * ----------------------------------------------------
+ * Handle drag start event of link list item
+ * @param {DragEvent} event
+ * ----------------------------------------------------
+ */
+function linkDragStart(event) {
+    let linkId = event.target.getAttribute("data-linkId");
+    event.dataTransfer.setData("text", "linkId-" + linkId);
+}
+
+/**
+ * ----------------------------------------------------
+ * set datatransfer when box list start dragging
+ * @param {DragEvent} event
+ * ----------------------------------------------------
+ */
+function boxDragStart(event) {
+    let boxId = event.target.getAttribute("data-boxId");
+    event.dataTransfer.setData("text", "boxId-" + boxId);
+}
+
+/**
+ * ----------------------------------------------------
+ * Change border color of box item when dragover or leave
+ * @param {DragEvent} event
+ * @param {string} mode enter/end
+ * ----------------------------------------------------
+ */
+function changeBorder(event, mode) {
+    event.preventDefault();
+    if (mode == "enter") {
+        event.currentTarget.classList.add("active");
+    } else {
+        event.currentTarget.classList.remove("active");
+    }
+}
+
+/**
+ * ----------------------------------------------------
+ * Register droped file or folder path(There's no way except for code below)
+ * @param {DragEvent} event
+ * ----------------------------------------------------
+ */
+function handleListDrop(event) {
+    event.preventDefault();
+
+    // get dropped elements data from dataTransfer
+    const eventStrs = event.dataTransfer.getData("text").split("-");
+    const mode = eventStrs[0];
+    const tgtId = eventStrs[1];
+    event.dataTransfer.clearData();
+    if (mode == "linkId") {
+        const draggedLink = $("[data-linkId='" +  tgtId + "']");
+        const rect = event.currentTarget.getBoundingClientRect();
+
+        /**
+         * @type {HTMLElement} event
+         */
+        const target = event.currentTarget;
+        // mouse cusor is at higher than element half
+        if ((event.clientY - rect.top) < (event.target.clientHeight / 2)) {
+			target.parentNode.insertBefore(draggedLink, target);
+
+        // mouse cursor is at lower than element half
+		} else {
+			target.parentNode.insertBefore(draggedLink, target.nextSibling);
+		}
+
+        changeBorder(event, 'end');
+        updateOrder("link");
+    }
+}
+
+/**
+ * ----------------------------------------------------
+ * Handle dropped box item or link item on the box item
+ * @param {DragEvent} event drop event
+ * ----------------------------------------------------
+ */
+function handleBoxDrop(event) {
+    event.preventDefault();
+    // get dropped elements data from dataTransfer
+    const eventStrs = event.dataTransfer.getData("text").split("-");
+    const mode = eventStrs[0];
+    const tgtId = eventStrs[1];
+    event.dataTransfer.clearData();
+
+    // handle dropped box item
+    if (mode == "boxId") {
+        const draggedBox = $("[data-boxId='" +  tgtId + "']");
+        const rect = event.currentTarget.getBoundingClientRect();
+        /**
+         * @type {HTMLElement} target
+         */
+        const target = event.currentTarget;
+
+        // mouse cusor is at higher than element half
+        if ((event.clientY - rect.top) < (event.target.clientHeight / 2)) {
+			target.parentNode.insertBefore(draggedBox, target);
+
+        // mouse cursor is at lower than element half
+		} else {
+			target.parentNode.insertBefore(draggedBox, target.nextSibling);
+		}
+
+        changeBorder(event, 'end');
+        updateOrder("box");
+    } else if(mode == "linkId") {
+        // handle dropped list item
+        const box = $(".f-box_item.active");
+        const boxId = box.getAttribute("data-boxId");
+        try {
+            // update link's box ID
+            db.execSQL("updateBoxId", {box_id: boxId, link_id: tgtId});
+
+            // update disp_order
+            db.execSQL("updateOrder", {table: "links", order_num: "999", id: tgtId});
+
+        } catch(e) {
+            alert(e.message);
+        }
+        changeBorder(event, 'end');
+
+        const boxTitle = $("l-boxTitle");
+        const activeBoxId = boxTitle.getAttribute("data-activeBoxId");
+        const activeBoxName = boxTitle.innerText;
+        readLinkList(null, activeBoxId, activeBoxName);
+    }
+}

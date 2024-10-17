@@ -1,0 +1,148 @@
+// ############################################################
+// Alternative for javascript class
+// Can not write class statement in hta
+// ############################################################
+/**
+ * ----------------------------------------------------
+ * Immutable, stateless, no instantiation
+ * ----------------------------------------------------
+ */
+function Util() {
+    this.fso = new ActiveXObject('Scripting.FileSystemObject');
+    this.shell = new ActiveXObject("WScript.Shell");
+}
+
+/**
+ * ----------------------------------------------------
+ * short hand for getElementById and querySelector
+ * @param {string} selector
+ * @return {HTMLElement|HTMLInputElement}
+ * ----------------------------------------------------
+ */
+Util.prototype.$ = function(selector) {
+    let elem = document.getElementById(selector);
+    if (!elem) {
+        elem = document.querySelector(selector);
+    }
+    return elem;
+}
+
+/**
+ * ----------------------------------------------------
+ * Get SQL or HTML from text file
+ * @param {string} fileName text file name
+ * @param {object} repObj replaceKey: value
+ * @return {string}
+ * ----------------------------------------------------
+ */
+Util.prototype.getComponent = function (fileName, repObj) {
+    let stream = this.fso.OpenTextFile("./component/" + fileName + ".html");
+    let text = stream.readAll();
+    stream.Close();
+
+    // Change text value if repObj is passed
+    if (repObj) {
+        for (let key in repObj) {
+            let repStr = "{\\$" + key + "}";
+            let regex = new RegExp(repStr, "g");
+            text = text.replace(regex, repObj[key]);
+            regex = null;
+        }
+    }
+
+    return text;
+}
+
+/**
+ * ----------------------------------------------------
+ * Clock
+ * @return {object.<string, string>}
+ * ----------------------------------------------------
+ */
+Util.prototype.drawClock = function () {
+    let clockObj = {date: "", time: ""}
+
+    const d = new Date();
+    const year = d.getFullYear();
+    let month = d.getMonth() + 1;
+    let date = d.getDate();
+
+    const dayNum = d.getDay();
+    const weekday = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"];
+    const day = weekday[dayNum];
+
+    let hour = d.getHours();
+    let min = d.getMinutes();
+    let sec = d.getSeconds();
+
+    month = month < 10 ? "0" + month : month;
+    date = date < 10 ? "0" + date : date;
+    hour = hour < 10 ? "0" + hour : hour;
+    min = min < 10 ? "0" + min : min;
+    sec = sec < 10 ? "0" + sec : sec;
+
+    const today = year + "." + month + "." + date + " " + day;
+    const time = hour + ":" + min + ":" + sec;
+
+    clockObj.date = today;
+    clockObj.time = time;
+    return clockObj;
+}
+
+/**
+ * ----------------------------------------------------
+ * Get Disk free space
+ * @param {string} watchPath
+ * @return {double}
+ * ----------------------------------------------------
+ */
+Util.prototype.getFreeSpace = function (watchPath) {
+    // Execute powershell script
+    const scriptRoot = this.fso.GetFolder(".").Path + "\\powershell\\";
+    let command = "powershell -WindowStyle Hidden -nologo -ExecutionPolicy Bypass -File "
+        + '"' + scriptRoot + 'getDiskSize.ps1" ' + watchPath;
+    ;
+    // 0: Hide Window, true: wait until command end
+    this.shell.Run(command, 0, true);
+
+    // read result from text file
+    let sr = new ActiveXObject("ADODB.Stream");
+    sr.Type = 2;
+    sr.charset = "utf-8";
+    sr.Open();
+    sr.LoadFromFile(scriptRoot + "result.txt");
+    let freeSpace = sr.ReadText(-1);
+    sr.Close();
+    sr = null;
+
+    return parseFloat(freeSpace.replace(/\r?\n|\r/g, ""));
+}
+
+/**
+ * ----------------------------------------------------
+ * Return icon type(web, folder, docs ...etc)
+ * Related to file name in the images folder
+ * @param {string} linkId
+ * @return {string}
+ * ----------------------------------------------------
+ */
+Util.prototype.getIconType = function (strLink) {
+    let iconType = "folder";
+    if (strLink.match(/^http/)) {
+        iconType = "web";
+    } else if (strLink.match(/\.xls.$/)) {
+        iconType = "excel"
+    } else if (strLink.match(/\.ppt.$/)) {
+        iconType = "powerpoint"
+    } else if (strLink.match(/\.doc.$/)) {
+        iconType = "word"
+    } else if (strLink.match(/\.exe$/)) {
+        iconType = "exe"
+    } else if (strLink.match(/\.(bat|js|ps1)$/)) {
+        iconType = "code"
+    } else if (strLink.match(/\.[0-9a-zA-Z]{2,}$/)) {
+        iconType = "docs";
+    }
+
+    return iconType;
+}

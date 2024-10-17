@@ -1,0 +1,11 @@
+SELECT
+[links$].id as link_id,
+[links$].box_id,
+[box$].box_name,
+[links$].link_name,
+[links$].link
+FROM [box$] LEFT OUTER JOIN [links$] ON [box$].id=[links$].box_id
+WHERE [box$].delete_flg='false'
+AND [links$].delete_flg='false'
+AND [box$].id='{$box_id}'
+ORDER BY CINT([links$].disp_order) asc

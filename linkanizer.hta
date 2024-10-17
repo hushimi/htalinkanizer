@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>linkanizer</title>
+    <link rel="stylesheet" type="text/css" href="./style/destyle.css" />
+    <link rel="stylesheet" type="text/css" href="./style/style.css" />
+</head>
+
+<body>
+    <!-- loading icon -->
+    <div class="loading-wrapper" id="loadingIcon">
+        <div class="loading">
+            <div class="loading_icon"></div>
+        </div>
+    </div>
+
+    <!-- Modal -->
+    <div id="manageModal" class="modal"></div>
+
+    <!-- link検索 -->
+    <header class="s-bar">
+        <div class="s-bar_inner">
+            <input type="text" placeholder="Search link from DB" name="s-bar" id="s-bar">
+            <button onclick="searchLink()"><img src="images/search.png" alt=""></button>
+        </div>
+    </header>
+
+    <div class="content-box">
+        <!-- folder表示 -->
+        <div class="f-box">
+            <div class="f-box_btnwrap">
+                <button class="img_btn btn_green" onclick="modalOpen(event, 'boxAdd')">
+                    <img src="images/box.png" alt="" class="mr-10">Add Box
+                </button>
+            </div>
+            <div class="f-box_listTitle">
+                <span class="ml-10">BOX LIST</span>
+            </div>
+            <!-- DBから取得したフォルダレコードを表示 -->
+            <div class="f-box_listBox">
+                <ul class="f-box_listWrap" id="boxList"></ul>
+            </div>
+        </div>
+
+        <!-- リンク表示 -->
+        <div class="l-box">
+            <!-- button Wrapper -->
+            <div class="l-box_toolbar" id="l-box_toolbar">
+                <div class="l-box_toolbar_clock">
+                    <p class="clock_date">1856.07.10 THU</p>
+                    <p class="clock_time">00:00:00</p>
+                </div>
+                <div class="l-box_toolbar_freeSpace" onclick="modalOpen(event, 'watchEdit')">
+                    <p class="server_name" id="watchName">---</p>
+                    <p class="server_freeSpace">000.00 GB</p>
+                </div>
+                <div class="l-box_toolbar_btnWrap">
+                    <div class="mr-10">
+                        <button class="img_btn btn_green" onclick="modalOpen(event, 'linkAdd')" disabled>
+                            <img src="images/plus.png">
+                        </button>
+                    </div>
+                    <div class="mr-10">
+                        <button class="img_btn btn_green" onclick="modalOpen(event, 'boxEdit')" disabled>
+                            <img src="images/pencil.png">
+                        </button>
+                    </div>
+                    <div class="mr-10">
+                        <button class="img_btn btn_green" onclick="openAll()" disabled>
+                            <img src="images/boom.png">
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- table title -->
+            <div class="l-box_listTitle">
+                <span class="ml-10" id="l-boxTitle" data-activeBoxId="0">
+                    Select box from the box list
+                </span>
+            </div>
+            <!-- Link table -->
+            <div class="l-box_listBox">
+                <ul class="l-box_listWrap" id="linkList"></ul>
+
+                <div class="scroll">
+                    <div class="scroll_Thumb" id="l-scrollThumb"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- DB接続ステータス表示 -->
+    <footer class="stat-bar">
+        <div class="stat-bar_status">
+            <p id="dbStatus"></p>
+        </div>
+        <div class="ml-10">
+            <button class="img_btn btn_green" id="reloadBtn" onclick="loadDatabase()">
+                <img src="images/reload.png">
+            </button>
+        </div>
+        <div class="ml-10">
+            <span style="color: gray;">Icons by
+                <span style="cursor: pointer;" onclick="openLink(event, 'https://icons8.jp/')">Icons8.</span>
+            </span>
+        </div>
+    </footer>
+
+    <script src="./app/global.jse"></script>
+    <script src="./app/excel.jse"></script>
+    <script src="./app/helper.jse"></script>
+    <script src="./app/modal.jse"></script>
+    <script src="./app/db.jse"></script>
+    <script src="./app/app.jse"></script>
+</body>
+
+</html>

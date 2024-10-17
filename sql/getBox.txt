@@ -1,0 +1,6 @@
+SELECT
+id,
+box_name
+FROM [box$]
+WHERE delete_flg="false"
+ORDER BY CINT(disp_order) asc

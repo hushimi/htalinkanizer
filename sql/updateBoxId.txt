@@ -1,0 +1,3 @@
+UPDATE [links$]
+SET box_id='{$box_id}'
+WHERE id='{$link_id}'

@@ -1,0 +1,4 @@
+AND ([links$].link_name LIKE '{$word}%'
+OR [links$].link_name LIKE '%{$word}%'
+OR [links$].link LIKE '{$word}%'
+OR [links$].link LIKE '%{$word}%')

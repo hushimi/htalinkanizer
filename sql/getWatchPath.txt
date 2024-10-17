@@ -1,0 +1,6 @@
+SELECT
+option_name,
+option_value
+FROM [options$]
+WHERE option_name='watch_name'
+OR option_name='watch_path'

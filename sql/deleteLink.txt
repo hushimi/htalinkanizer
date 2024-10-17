@@ -1,0 +1,3 @@
+UPDATE [links$]
+SET delete_flg='true'
+WHERE id='{$link_id}'

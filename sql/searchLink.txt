@@ -1,0 +1,12 @@
+SELECT
+[links$].link_name,
+[links$].link,
+[links$].box_id,
+[box$].box_name
+FROM [links$] LEFT OUTER JOIN [box$] ON [links$].box_id=[box$].id
+WHERE [links$].delete_flg='false'
+AND [box$].delete_flg='false'
+AND ([links$].link_name LIKE '{$word}%'
+OR [links$].link_name LIKE '%{$word}%'
+OR [links$].link LIKE '{$word}%'
+OR [links$].link LIKE '%{$word}%')

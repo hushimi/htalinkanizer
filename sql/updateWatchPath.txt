@@ -1,0 +1,7 @@
+UPDATE [options$]
+SET option_value=SWITCH(
+    option_name='watch_name',
+    '{$watchTitle}',
+    option_name='watch_path',
+    '{$watchPath}'
+)

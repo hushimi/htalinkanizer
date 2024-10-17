@@ -1,0 +1,11 @@
+<li class="l-box_item" onclick="openLink(event, '{$link}')" data-attr-link="{$link}">
+    <span class="ml-10">
+        <img src="images/{$icon}.png" alt="" class="mr-10">{$link_name}
+    </span>
+    <div class="l-box_item_btns align-left">
+        <button class="img_btn btn_green" onclick="readLinkList(event, '{$box_id}', '{$box_name}')">
+            <img src="images/box.png">
+        </button>
+    </div>
+</li>
+<span class="ml-10 l-box_schlink">{$link_text}</span>

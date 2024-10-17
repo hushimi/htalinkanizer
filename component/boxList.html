@@ -1,0 +1,10 @@
+<li class="f-box_item" onclick="readLinkList(event, {$id}, '{$box_name}')" data-boxId="{$id}" draggable="true"
+    ondragover="changeBorder(event, 'enter')" ondragleave="changeBorder(event, 'end')" ondrop="handleBoxDrop(event)"
+    ondragstart="boxDragStart(event)">
+    <span class="ml-10">{$box_name}</span>
+    <div class="mr-10">
+        <button class="img_btn btn_red" onclick="modalOpen(event, 'boxDelete')">
+            <img src="images/delete.png">
+        </button>
+    </div>
+</li>

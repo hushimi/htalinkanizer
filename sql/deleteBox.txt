@@ -1,0 +1,3 @@
+UPDATE [box$]
+SET [box$].delete_flg='true'
+WHERE [box$].id='{$box_id}'

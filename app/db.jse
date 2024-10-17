@@ -1,0 +1,185 @@
+/**
+ * ----------------------------------------------------
+ * Database connection
+ * Read sql string
+ * execute query
+ * ----------------------------------------------------
+ */
+function DB() {
+    this.ado = new ActiveXObject("ADODB.Connection");
+    this.fso = new ActiveXObject('Scripting.FileSystemObject');
+}
+
+/**
+ * ----------------------------------------------------
+ * Try ADODB connection
+ * @return {boolean}
+ * ----------------------------------------------------
+ */
+DB.prototype.loadDB = function() {
+    const filePath = ".\\database.xlsx";
+    let conStr = 'Provider=Microsoft.ACE.OLEDB.12.0;Data Source=' +
+        filePath + ';Extended Properties="Excel 12.0;HDR=yes;ReadOnly=0;"'
+    ;
+
+    this.ado.connectionString = conStr;
+    try {
+        this.ado.Open();
+        return true;
+    } catch (error) {
+        return false;
+    }
+}
+
+/**
+ * ----------------------------------------------------
+ * Close ADO connection
+ * ----------------------------------------------------
+ */
+DB.prototype.closeDB = function() {
+    try {
+        this.ado.Close();
+    } catch (error) {
+        alert(error);
+    }
+}
+
+/**
+ * ----------------------------------------------------
+ * Get SQL string
+ * @param {string} fileName
+ * @param {object.<string, string>} repObj
+ * @return {string}
+ * ----------------------------------------------------
+ */
+DB.prototype.getSQLStr = function(fileName, repObj) {
+    let stream = this.fso.OpenTextFile("./sql/" + fileName + ".txt");
+    let text = stream.readAll();
+    stream.Close();
+
+    // Change text value if repObj is passed
+    if (repObj) {
+        for (let key in repObj) {
+            let repStr = "{\\$" + key + "}";
+            let regex = new RegExp(repStr, "g");
+            text = text.replace(regex, repObj[key]);
+            regex = null;
+        }
+    }
+
+    return text;
+}
+
+/**
+ * ----------------------------------------------------
+ * execute sql
+ * @param {string} fileName
+ * @param {object.<string, string>} queryObj
+ * @return {boolean}
+ * ----------------------------------------------------
+ */
+DB.prototype.execSQL = function(fileName, queryObj) {
+    let sql = this.getSQLStr(fileName, queryObj);
+
+    // Create Data
+    try {
+        this.ado.Execute(sql);
+        return true;
+    } catch (e) {
+        alert(e.message);
+        return false;
+    }
+}
+
+/**
+ * ----------------------------------------------------
+ * execute query and get records
+ * @param {string} fileName
+ * @param {object.<string, string>} queryObj
+ * @return {object[]} object array
+ * ----------------------------------------------------
+ */
+DB.prototype.getQueryResult = function(fileName, queryObj) {
+    let sql = this.getSQLStr(fileName, queryObj);
+    let resultObj = {};
+    let records = [];
+    try {
+        const rs = this.ado.Execute(sql);
+        while (!rs.EOF) {
+            // add key and value to object
+            for (let index = 0; index < rs.Fields.count; index++) {
+                resultObj[rs.Fields(index).Name] = rs.Fields(index).value;
+            }
+
+            records.push(resultObj);
+            resultObj = {};
+            rs.MoveNext();
+        }
+    } catch (error) {
+        alert(error);
+    }
+
+    return records;
+}
+
+/**
+ * ----------------------------------------------------
+ * execute query and get search result
+ * @param {string[]} words string array
+ * @return {object.<string, string>[]} object array
+ * ----------------------------------------------------
+ */
+DB.prototype.getSearchResult = function(words) {
+    let sql = "";
+    let isFirst = true;
+    for (let index = 0; index < words.length; index++) {
+        if (isFirst) {
+            sql += this.getSQLStr("searchLink", {word: words[index]});
+            isFirst = false;
+        } else {
+            sql += this.getSQLStr("addSearch", {word: words[index]});
+        }
+    }
+
+    let resultObj = {};
+    let records = [];
+    try {
+        const rs = this.ado.Execute(sql);
+        while (!rs.EOF) {
+            // add key and value to object
+            for (let index = 0; index < rs.Fields.count; index++) {
+                resultObj[rs.Fields(index).Name] = rs.Fields(index).value;
+            }
+
+            records.push(resultObj);
+            resultObj = {};
+            rs.MoveNext();
+        }
+    } catch (error) {
+        alert(error);
+    }
+
+    return records;
+}
+
+/**
+ * ----------------------------------------------------
+ * Get max number from specified column in the specified table
+ * @param {string} tableName
+ * @param {string} columnName
+ * ----------------------------------------------------
+ */
+DB.prototype.getMaxNum = function(tableName, columnName) {
+    let maxNum = 0;
+    try {
+        let sql = this.getSQLStr("getMaxNum", {table: tableName, column: columnName});
+        let rs = this.ado.Execute(sql);
+        maxNum = (!rs.Fields(0).value) ? 1 : Number(rs.Fields(0).value) + 1;
+
+    } catch(e) {
+        alert(e.message);
+        maxNum = 0;
+    }
+
+    return maxNum;
+}

@@ -1,0 +1,1 @@
+UPDATE [{$table}$] SET disp_order='{$order_num}' WHERE id='{$id}'

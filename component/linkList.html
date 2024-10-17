@@ -1,0 +1,16 @@
+<li class="l-box_item" onclick="openLink(event, '{$link}')" data-attr-link="{$link}" data-linkId="{$link_id}"
+    draggable="true" ondragover="changeBorder(event, 'enter')" ondragleave="changeBorder(event, 'end')"
+    ondragstart="linkDragStart(event)" ondrop="handleListDrop(event)">
+    <span class="ml-10">
+        <img src="images/{$icon}.png" alt="" class="mr-10">{$link_name}
+    </span>
+    <div class="l-box_item_btns">
+        <button class="img_btn btn_green" onclick="modalOpen(event, 'linkEdit')" data-linkId="{$link_id}"
+            data-linkName="{$link_name}">
+            <img src="images/pencil.png">
+        </button>
+        <button class="img_btn btn_red" onclick="deleteLink('{$link_id}')">
+            <img src="images/delete.png">
+        </button>
+    </div>
+</li>

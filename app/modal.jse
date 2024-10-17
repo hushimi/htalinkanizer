@@ -1,0 +1,136 @@
+/**
+ * ----------------------------------------------------
+ * Control modal
+ * Extends Helper class
+ * ----------------------------------------------------
+ */
+function Modal() {
+    Helper.call(this);
+
+    /**
+     * @type {HTMLDivElement}
+     */
+    this.wrapper = $('manageModal');
+}
+Modal.prototype = new Helper();
+
+/**
+ * ----------------------------------------------------
+ * Show modal component
+ * ----------------------------------------------------
+ */
+Modal.prototype.show = function () {
+    this.wrapper.style.display = "block";
+    this.wrapper.innerHTML = Modal.prototype.getComponent("modal", {});
+}
+
+/**
+ * ----------------------------------------------------
+ * Reset modal component
+ * ----------------------------------------------------
+ */
+Modal.prototype.hide = function() {
+    this.wrapper.style.display = "none";
+    this.wrapper.innerHTML = "";
+}
+
+/**
+ * ----------------------------------------------------
+ * get modal parts HTML
+ * @param {array.<string>} partNames
+ * @return {string} HTML code
+ * ----------------------------------------------------
+ */
+Modal.prototype.getModalComponents = function (partNames) {
+    let componentHTML = "";
+    partNames.forEach(function(partName) {
+        componentHTML += Modal.prototype.getComponent(partName, {});
+    });
+    return componentHTML;
+}
+
+/**
+ * ----------------------------------------------------
+ * prepare Box modal
+ * @param {string} titleStr
+ * @param {string} mode
+ * ----------------------------------------------------
+ */
+Modal.prototype.prepareBoxModal = function(titleStr, mode) {
+    // get component
+    $("modalBody").innerHTML = this.getModalComponents(["modalBoxName", "modalUpdateBtn"]);
+
+    // get DOM element
+    $("modalTitle").innerText = titleStr;
+    $("modalBoxName").$("input[name='boxName']").focus();
+
+    // set function to UpdateBtn
+    const boxName = $("l-boxTitle").innerText;
+    if (mode == "boxAdd") {
+        $("modalUpdateBtn").setAttribute("onclick", "createBox()");
+    } else {
+        $("modalBoxName").$("input[name='boxName']").value = boxName;
+        $("modalUpdateBtn").setAttribute("onclick", "updateBox()");
+    }
+}
+
+/**
+ * ----------------------------------------------------
+ * prepare Link modal
+ * @param {string} titleStr
+ * @param {string} mode
+ * ----------------------------------------------------
+ */
+Modal.prototype.prepareLinkModal = function (titleStr, mode) {
+    // get component
+    const modalBody = $("modalBody");
+    modalBody.innerHTML = this.getModalComponents([
+        "modalLinkName",
+        "modalLinkPath",
+        "modalUpdateBtn"
+    ]);
+
+    $("modalTitle").innerText = titleStr;
+    $("modalLinkName").$("input[name='linkName']").focus();
+
+    // set function to UpdateBtn
+    if (mode === "linkAdd") {
+        $("modalUpdateBtn").setAttribute("onclick", "createLink()");
+    } else if (mode === "watchEdit") {
+        $("modalLinkName").$("input[name='linkName']").value = watchObj.watch_name;
+        $("modalLinkPath").$("input[name='url']").value = watchObj.watch_path;
+        $("modalUpdateBtn").setAttribute("onclick", "updateWatchData()");
+    }
+}
+
+/**
+ * ----------------------------------------------------
+ * set link information to element
+ * @param {string} linkPath
+ * @param {string} linkName
+ * @param {string} linkId
+ * ----------------------------------------------------
+ */
+Modal.prototype.prepareLinkEdit = function(linkPath, linkName, linkId) {
+    $("modalLinkName").$("input[name='linkName']").value = linkName;
+    $("modalLinkPath").$("input[name='url']").value = linkPath.replace(/\\\\/g, "\\");
+    $("modalUpdateBtn").setAttribute("onclick", "updateLink(" + linkId + ")");
+}
+
+/**
+ * ----------------------------------------------------
+ * prepare Box delete modal
+ * @param {string} boxId
+ * ----------------------------------------------------
+ */
+Modal.prototype.prepareDeleteBoxModal = function(boxId) {
+    $("modalBody").innerHTML = this.getModalComponents(["modalMsg", "modalYesNo"]);
+
+    $("modalTitle").innerText = "WARNING";
+    $("modalTitle").style.color = "#f781b0";
+
+    $("modalDelete").setAttribute("onclick", "deleteBox(" +  boxId + ")");
+    $("modalCancel").setAttribute("onclick", "modalClose()");
+
+    $("modalYesNo").style.display = "flex";
+}

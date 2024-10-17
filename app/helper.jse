@@ -1,0 +1,93 @@
+/**
+ * ----------------------------------------------------
+ * Provides helper function for this app
+ * ----------------------------------------------------
+ */
+function Helper() {
+    this.fso = new ActiveXObject('Scripting.FileSystemObject');
+    this.shell = new ActiveXObject("WScript.Shell");
+}
+
+/**
+ * ----------------------------------------------------
+ * Get SQL or HTML from text file
+ * @param {string} fileName text file name
+ * @param {object} repObj replaceKey: value
+ * @return {string}
+ * ----------------------------------------------------
+ */
+Helper.prototype.getComponent = function (fileName, repObj) {
+    let stream = this.fso.OpenTextFile("./component/" + fileName + ".html");
+    let text = stream.readAll();
+    stream.Close();
+
+    // Change text value if repObj is passed
+    if (repObj) {
+        for (let key in repObj) {
+            let repStr = "{\\$" + key + "}";
+            let regex = new RegExp(repStr, "g");
+            text = text.replace(regex, repObj[key]);
+            regex = null;
+        }
+    }
+
+    return text;
+}
+
+/**
+ * ----------------------------------------------------
+ * Get Disk free space via powershell
+ * @param {string} watchPath
+ * @return {double}
+ * ----------------------------------------------------
+ */
+Helper.prototype.getFreeSpace = function (watchPath) {
+    // Execute powershell script
+    const scriptRoot = this.fso.GetFolder(".").Path + "\\powershell\\";
+    let command = "powershell -WindowStyle Hidden -nologo -ExecutionPolicy Bypass -File "
+        + '"' + scriptRoot + 'getDiskSize.ps1" ' + watchPath;
+    ;
+    // 0: Hide Window, true: wait until command end
+    this.shell.Run(command, 0, true);
+
+    // read result from text file
+    let sr = new ActiveXObject("ADODB.Stream");
+    sr.Type = 2;
+    sr.charset = "utf-8";
+    sr.Open();
+    sr.LoadFromFile(scriptRoot + "result.txt");
+    let freeSpace = sr.ReadText(-1);
+    sr.Close();
+    sr = null;
+
+    return parseFloat(freeSpace.replace(/\r?\n|\r/g, ""));
+}
+
+/**
+ * ----------------------------------------------------
+ * Return icon type(web, folder, docs ...etc)
+ * Related to file name in the images folder
+ * @param {string} linkId
+ * @return {string}
+ * ----------------------------------------------------
+ */
+Helper.prototype.getIconType = function (strLink) {
+    let iconType = "folder";
+    if (strLink.match(/^http/)) {
+        iconType = "web";
+    } else if (strLink.match(/\.xls.$/)) {
+        iconType = "excel"
+    } else if (strLink.match(/\.ppt.$/)) {
+        iconType = "powerpoint"
+    } else if (strLink.match(/\.doc.$/)) {
+        iconType = "word"
+    } else if (strLink.match(/\.exe$/)) {
+        iconType = "exe"
+    } else if (strLink.match(/\.(bat|js|ps1)$/)) {
+        iconType = "code"
+    } else if (strLink.match(/\.[0-9a-zA-Z]{2,}$/)) {
+        iconType = "docs";
+    }
+
+    return iconType;
+}

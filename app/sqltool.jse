@@ -1,0 +1,261 @@
+/**
+ * ----------------------------------------------------
+ * Global variable
+ * ----------------------------------------------------
+ */
+var doc = document;
+eval('var document = doc');
+
+var shell = new ActiveXObject('WScript.Shell');
+var fso = new ActiveXObject('Scripting.FileSystemObject');
+var ado;
+var result_tsv = '';
+
+/**
+ * ----------------------------------------------------
+ * Window events
+ * ----------------------------------------------------
+ */
+window.onload = function(){
+    window.onresize();
+    try{
+        document.querySelectorAll("*").sql.value = shell.RegRead("HKCU\\SQLEXEC\\SQLLOG");
+    }catch( e ){
+//    	alert(e.message);
+    }
+};
+window.onresize = function(){
+  // adjust window height
+  document.querySelectorAll("*").result.style.height = document.body.clientHeight
+    - document.querySelectorAll("*").t1.clientHeight - document.querySelectorAll("*").status.clientHeight;
+};
+window.onunload = function(){
+    closeADO();
+};
+
+/**
+ * ----------------------------------------------------
+ * Write ADO status
+ * @param {string} mes
+ * ----------------------------------------------------
+ */
+function setStatusText( mes ){
+    document.querySelectorAll("*").status.innerHTML = mes;
+}
+
+/**
+ * ----------------------------------------------------
+ * Close ADO connection
+ * ----------------------------------------------------
+ */
+function closeADO(){
+    try{
+        ado.Close();
+    }catch( e ){
+
+    }
+    ado = null;
+    setStatusText('Disconnected Successfully.');
+}
+
+/**
+ * ----------------------------------------------------
+ * Read file path and execute _loadDatabase function
+ * @return {boolean}
+ * ----------------------------------------------------
+ */
+function loadDatabase(){
+    var filepath = document.getElementById('fileselector').value || document.getElementById('filename').value;
+    var readonly = document.getElementById('readonly').checked;
+    var hdr = document.getElementById('hdr').checked;
+    document.getElementById('filename').value = filepath;
+    document.getElementById('fileselector').parentNode.innerHTML = document.getElementById('fileselector').parentNode.innerHTML;
+
+    // wait for unlock file
+    setTimeout(function(){
+        _loadDatabase(filepath, readonly, hdr);
+    }, 10);
+    return false;
+}
+
+/**
+ * ----------------------------------------------------
+ * Try ADODB connection according to the file extension
+ * Supported file type [xlsx only]
+ * @param {string} filepath
+ * @param {boolean} readonly
+ * @param {boolean} hdr
+ * ----------------------------------------------------
+ */
+function _loadDatabase( filepath, readonly, hdr ){
+    closeADO();
+    ado = new ActiveXObject("ADODB.Connection");
+    var connect = [];
+    var isConnected = false;
+
+    if( filepath.match(/(\.xlsx|\.xlsm)$/i) ){
+        connect.push('Provider=Microsoft.ACE.OLEDB.12.0;Data Source=' + filepath + ';Extended Properties="Excel 12.0;HDR=' + (hdr ? 'Yes' :'No') + ';ReadOnly=' + (readonly ? 1 : 0) + ';"');
+        // connect.push('Provider=Microsoft.ACE.OLEDB.12.0;Data Source=' + filepath + ';Extended Properties="Excel 12.0;HDR=' + (hdr ? 'Yes' :'No') + ';ReadOnly=' + (readonly ? 1 : 0) + ';"');
+        // connect.push('Provider=Microsoft.ACE.OLEDB.12.0;Data Source=' + filepath + ';Extended Properties="Excel 12.0;HDR=' + (hdr ? 'Yes' :'No') + ';ReadOnly=' + (readonly ? 1 : 0) + ';"');
+        // connect.push('Provider=Microsoft.ACE.OLEDB.12.0;Data Source=' + filepath + ';Extended Properties="Excel 12.0;HDR=' + (hdr ? 'Yes' :'No') + ';ReadOnly=' + (readonly ? 1 : 0) + ';"');
+        // connect.push('Provider=Microsoft.ACE.OLEDB.12.0;Data Source=' + filepath + ';Extended Properties="Excel 12.0;HDR=' + (hdr ? 'Yes' :'No') + ';ReadOnly=' + (readonly ? 1 : 0) + ';"');
+    } else {
+        alert("XLSX ONLY!!");
+        return;
+    }
+
+    document.querySelectorAll("*").result.innerHTML = '';
+    for(var i in connect){
+        document.querySelectorAll("*").result.innerHTML += 'Connect String:<br /><pre>' + connect[i] + '</pre>';
+        ado = new ActiveXObject("ADODB.Connection");
+        ado.connectionString = connect[i];
+        try{
+            ado.Open();
+            setStatusText('Connected Successfully.');
+            isConnected = true;
+            break;
+        }catch(e){
+            ado = null;
+            document.querySelectorAll("*").result.innerHTML += 'Failed:<pre>' + e.message + '</pre>';
+            setStatusText('Connection Failed.');
+        }
+    }
+
+    if (!isConnected) { alert("Connection failed try again"); }
+}
+
+/**
+ * ----------------------------------------------------
+ * Execute SQL and draw result table then save SQL log
+ * @param {string} sql
+ * ----------------------------------------------------
+ */
+function executeSQL( sql ){
+    try{
+        var times = [new Date()];
+        // empty result text
+        setStatusText('');
+
+        var rs = ado.Execute(sql);
+        times.push( new Date() );
+        if (rs.state == 0) {
+          alert('updated!');
+          document.querySelectorAll("*").sql.value = "Select * from [$]";
+          return;
+        }
+
+        // get table object
+        var buf2 = createTableFromRecordSet( rs );
+        times.push( new Date() );
+
+        document.querySelectorAll("*").result.innerHTML = '';
+        document.querySelectorAll("*").result.appendChild( buf2.dom_table );
+        window.result_tsv = buf2.tsv;
+        times.push( new Date() );
+
+        setStatusText("Records: " + buf2.count
+            + ",\tSQL Execution Time: " + (times[1] - times[0])
+            + "ms,\tTable Construction Time: " + (times[2] - times[1])
+            + "ms,\tDrawing Time: " + (times[3] - times[2]) + "ms");
+
+        // Write SQL logs to Registry
+        shell.RegWrite("HKCU\\SQLEXEC\\SQLLOG", sql, "REG_SZ");
+        shell.RegWrite("HKCU\\SQLEXEC\\LASTDB", document.querySelectorAll("*").filename.value, "REG_SZ")
+
+    }catch( e ){
+        alert(e.message);
+    }
+}
+
+/**
+ * ----------------------------------------------------
+ * Convert RecordSet into HTML table
+ * @param {object} rs
+ * @return {object}
+ * ----------------------------------------------------
+ */
+function createTableFromRecordSet( rs ){
+    var table = document.createElement('table');
+    var tbody = document.createElement('tbody');
+    var row;
+    var cell;
+    var buf_tsv = [];
+    var buf_tsv_row = [];
+    var count = 0;
+
+    // Create table from RecordSet
+    if( !rs.Eof ){
+        // Create table header
+        var fc = rs.Fields.Count;
+        row = document.createElement('tr');
+        for( var i = 0; i < fc; i++ ){
+            cell = document.createElement('th');
+            cell.innerText = rs.Fields(i).name;
+            cell.title = rs.Fields(i).Type;
+            row.appendChild(cell);
+            buf_tsv_row.push( escapeTSV(rs.Fields(i).name) );
+        }
+        tbody.appendChild(row);
+        buf_tsv.push( buf_tsv_row.join('\t') );
+
+        // Create record table
+        while( !rs.Eof ){
+            row = document.createElement('tr');
+            buf_tsv_row = [];
+            for( var i = 0; i < fc; i++ ){
+                var v = rs.Fields(i).value;
+                cell = document.createElement('td');
+                cell.innerText = v;
+                row.appendChild(cell);
+                buf_tsv_row.push( escapeTSV(v) );
+            }
+            tbody.appendChild(row);
+            buf_tsv.push( buf_tsv_row.join('\t') );
+            count++;
+            rs.MoveNext();
+        }
+        table.appendChild(tbody);
+    }
+
+    return {"count":count,"dom_table":table,"tsv":buf_tsv.join('\n')}
+}
+
+/**
+ * ----------------------------------------------------
+ * Escape double quotation
+ * @param {string} data
+ * ----------------------------------------------------
+ */
+function escapeTSV(data){
+    if(typeof data == 'string'){
+        data = '"' + data.replace(/"/g,'""') + '"';
+    }
+    return data;
+}
+
+/**
+ * ----------------------------------------------------
+ * This func is called from UI
+ * Read table structure and draw result
+ * ----------------------------------------------------
+ */
+function getTableStructure(){
+    try{
+        var rs = ado.OpenSchema(4);
+        document.querySelectorAll("*").result.innerHTML = '';
+        document.querySelectorAll("*").result.appendChild( createTableFromRecordSet( rs ).dom_table );
+
+    }catch( e ){
+        alert(e.message);
+    }
+}
+
+/**
+ * ----------------------------------------------------
+ * This func is called from UI
+ * Copy result to clipboard
+ * ----------------------------------------------------
+ */
+function copyTable(){
+    clipboardData.setData("Text", window.result_tsv);
+}
